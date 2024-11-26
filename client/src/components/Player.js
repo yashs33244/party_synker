@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './Player.css';
 import io from 'socket.io-client';
 
-const socket = io('http://10.0.6.18:5000/');
+const socket = io(process.env.REACT_APP_SOCKET_IO_URL);
 
 const Player = () => {
   const [users, setUsers] = useState([]);

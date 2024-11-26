@@ -111,7 +111,7 @@ const updateUsers = () => {
   io.emit("users", users);
 };
 
-const baseURL = "https://songlist.s3.eu-north-1.amazonaws.com/";
+const baseURL = process.env.SONG_URL;
 
 io.on("connection", (socket) => {
   // Add new user on connection
@@ -151,8 +151,8 @@ io.on("connection", (socket) => {
   });
 });
 
-httpServer.listen(5000, '0.0.0.0' ,() => {
-  console.log("Server started at port 5000");
+httpServer.listen(3001, '0.0.0.0' ,() => {
+  console.log("Server started at port 3001");
 });
 
 

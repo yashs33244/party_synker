@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './admin.css';
 import io from 'socket.io-client';
 
-const socket = io('http://10.0.6.18:5000/');
+const socket = io(process.env.REACT_APP_SOCKET_IO_URL);
 
 export default function Admin() {
   const [flag, setFlag] = useState(false);

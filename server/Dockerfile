@@ -1,20 +1,17 @@
-# Use an official Node.js image as the base image
+# Use Node.js for running the server
 FROM node:18
 
-# Set the working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY server/package*.json ./
-
-# Install dependencies
+# Copy server package.json and install dependencies
+COPY server/package.json server/package-lock.json ./
 RUN npm install
 
-# Copy the rest of the application code
+# Copy the server source code into the container
 COPY server/ ./
 
-# Expose the port the app runs on
-EXPOSE 5000
+# Expose the port your server listens on
+EXPOSE 3001
 
 # Start the server
 CMD ["node", "index.js"]

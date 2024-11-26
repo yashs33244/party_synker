@@ -1,29 +1,30 @@
-# Use an official Node.js image as the base image
-FROM node:18 AS build
+# Use Node.js for building and running the app
+FROM node:18
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy only the package.json and package-lock.json to install dependencies
-COPY package.json package-lock.json ./
-
-# Install dependencies
+# Copy client package.json and install dependencies
+COPY client/package.json client/package-lock.json ./
 RUN npm install
 
-# Copy the rest of the application code to the working directory
-COPY . .
+# Copy the client source code into the container
+COPY client/ ./
+
+# Set the environment variable for the React app
+ARG REACT_APP_SOCKET_IO_URL
+ENV REACT_APP_SOCKET_IO_URL=$REACT_APP_SOCKET_IO_URL
 
 # Build the React app
 RUN npm run build
 
-# Use a lightweight web server to serve the built app
-FROM nginx:alpine
+# Install `serve` to serve the built files on port 3000
+RUN npm install -g serve
 
-# Copy the built files from the previous stage to the nginx html folder
-COPY --from=build /app/build /usr/share/nginx/html
+# Set the working directory to the build output
+WORKDIR /app/build
 
-# Expose port 80
-EXPOSE 80
+# Expose port 3000
+EXPOSE 3000
 
-# Start nginx in the foreground
-CMD ["nginx", "-g", "daemon off;"]
+# Serve the built React app on port 3000
+CMD ["serve", "-s", ".", "-l", "3000"]
