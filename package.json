@@ -1,5 +1,11 @@
 {
+  "scripts": {
+    "prisma:generate": "cd shared-db && npx prisma generate",
+    "prisma:migrate": "cd shared-db && npx prisma migrate dev",
+    "prisma:studio": "cd shared-db && npx prisma studio"
+  },
   "dependencies": {
-    "aws-sdk": "^2.1669.0"
+    "aws-sdk": "^2.1669.0",
+    "shared-db": "file:../shared-db"
   }
 }

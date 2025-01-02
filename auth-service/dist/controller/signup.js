@@ -13,43 +13,38 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createUser = void 0;
-const index_1 = __importDefault(require("../db/schema/index"));
-const generateToken_1 = require("../utils/generateToken");
-const bcrypt_1 = __importDefault(require("bcrypt"));
+const auth_service_1 = require("../services/auth.service");
+const schema_1 = __importDefault(require("../db/schema"));
+const authService = new auth_service_1.AuthService();
 const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        if (!(req.body.email &&
-            req.body.password &&
-            req.body.name &&
-            req.body.username)) {
-            res.status(400).send("All input is required");
+        if (!(req.body.email && req.body.password && req.body.name && req.body.username)) {
+            return res.status(400).send("All input is required");
         }
-        const oldUser = yield index_1.default.findOne({ email: req.body.email });
+        const oldUser = yield schema_1.default.findOne({ email: req.body.email });
         if (oldUser) {
             return res.status(409).send("User Already Exist. Please Login");
         }
-        const salt = 10;
-        const hashedPassword = yield bcrypt_1.default.hash(req.body.password, salt);
-        const newUser = new index_1.default({
-            name: req.body.name,
-            username: req.body.username,
+        const { mongoUser, token } = yield authService.createUser({
             email: req.body.email,
-            password: hashedPassword,
+            password: req.body.password,
+            name: req.body.name,
+            username: req.body.username
         });
-        const user = yield newUser.save();
-        const token = (0, generateToken_1.createSecretToken)(user._id);
         res.cookie("token", token, {
-            path: "/", // Cookie is accessible from all paths
-            expires: new Date(Date.now() + 86400000), // Cookie expires in 1 day
-            secure: true, // Cookie will only be sent over HTTPS
-            httpOnly: true, // Cookie cannot be accessed via client-side scripts
+            path: "/",
+            expires: new Date(Date.now() + 86400000),
+            secure: true,
+            httpOnly: true,
             sameSite: "none",
         });
-        console.log("cookie set succesfully");
-        res.json(user);
+        res.json({
+            user: mongoUser,
+        });
     }
     catch (error) {
-        console.log("Gott an error", error);
+        console.log("Got an error", error);
+        res.status(500).json({ error: "Internal server error" });
     }
 });
 exports.createUser = createUser;
