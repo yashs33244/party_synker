@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "rootDir": "../",  // Change this to include parent directory
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "paths": {
+      "@shared/*": ["../shared-db/*"]
+    },
+    // ... other options
+  },
+  "include": [
+    "src/**/*",
+    "../shared-db/**/*"  // Include shared-db files
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
