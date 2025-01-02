@@ -1,0 +1,20 @@
+{
+  "name": "shared-db",
+  "version": "1.0.0",
+  "main": "dist/lib/prisma.js",
+  "types": "dist/lib/prisma.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@prisma/client": "^4.x.x"
+  },
+  "devDependencies": {
+    "typescript": "^4.x.x",
+    "prisma": "^4.x.x"
+  }
+}
