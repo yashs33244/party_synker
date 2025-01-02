@@ -1,18 +1,23 @@
 
-  // src/index.ts
+
   import { createServer } from 'http';
   import { WebSocketServer } from 'ws';
   import { User } from './User';
   import { UserManager } from './UserManager';
   import { SubscriptionManager } from './SubscriptionManager';
-  import { IncomingMessage } from './types/in';
+  import { CloseRoomPayload, CreateRoomPayload, IncomingMessage, JoinRoomPayload, LeaveRoomPayload, PauseMusicPayload, PlayMusicPayload, SeekMusicPayload, UserMessagePayload } from './types/in';
   import prisma from '../../shared-db';
-import { parse } from 'url';
+  import { parse } from 'url';
   
   
   
   const userManager = new UserManager();
-  const subscriptionManager = new SubscriptionManager(prisma, userManager);
+  const config = {
+    clientId: process.env.SPOTIFY_CLIENT_ID || '',
+    clientSecret: process.env.SPOTIFY_CLIENT_SECRET || '',
+    redirectUri: process.env.SPOTIFY_REDIRECT_URI || ''
+  }
+  const subscriptionManager = new SubscriptionManager(prisma, userManager,config);
   
   const server = createServer();
   const wss = new WebSocketServer({ server });
@@ -45,25 +50,34 @@ import { parse } from 'url';
   
       ws.on('message', async (data: string) => {
         try {
-          const message: IncomingMessage = JSON.parse(data);
+          const message:IncomingMessage = JSON.parse(data);
           console.log('Received message:', message);
   
           switch (message.type) {
             case 'CREATE_ROOM':
-              const room = await subscriptionManager.handleCreateRoom(message.payload);
+              const room = await subscriptionManager.handleCreateRoom(message.payload as CreateRoomPayload);
               console.log('Room created:', room);
               break;
             case 'JOIN_ROOM':
-              await subscriptionManager.handleJoinRoom(message.payload);
+              await subscriptionManager.handleJoinRoom(message.payload as JoinRoomPayload);
               break;
             case 'LEAVE_ROOM':
-              await subscriptionManager.handleLeaveRoom(message.payload);
+              await subscriptionManager.handleLeaveRoom(message.payload as LeaveRoomPayload);
               break;
             case 'CLOSE_ROOM':
-              await subscriptionManager.handleCloseRoom(message.payload);
+              await subscriptionManager.handleCloseRoom(message.payload as CloseRoomPayload);
               break;
             case 'USER_MESSAGE':
-              await subscriptionManager.handleUserMessage(message.payload);
+              await subscriptionManager.handleUserMessage(message.payload as UserMessagePayload);
+              break;
+            case 'PLAY_MUSIC':
+              await subscriptionManager.handlePlayMusic(message.payload as PlayMusicPayload);
+              break;
+            case 'PAUSE_MUSIC':
+              await subscriptionManager.handlePauseMusic(message.payload as PauseMusicPayload);
+              break;
+            case 'SEEK_MUSIC':
+              await subscriptionManager.handleSeekMusic(message.payload as SeekMusicPayload);
               break;
           }
         } catch (error:any) {

@@ -26,7 +26,7 @@ app.use((req, res, next) => {
     // Pass to next layer of middleware
     next();
 });
-app.use("/api", route_1.router);
+app.use("/api/auth", route_1.router);
 app.listen(PORT, () => {
     console.log(`Server is running on PORT ${PORT}`);
 });

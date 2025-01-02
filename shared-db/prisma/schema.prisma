@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,15 +8,22 @@ datasource db {
 }
 
 model User {
-  id          String        @id @default(cuid())
-  name        String?
-  email       String        @unique
-  mongoAuthId String        @unique // Store MongoDB _id here
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  joinedRooms UsersInRoom[]
-  hostedRooms Room[]        @relation("RoomHost")
-  messages    Message[] // Add relation to messages
+  id                  String        @id @default(cuid())
+  name                String?
+  email               String        @unique
+  mongoAuthId         String        @unique
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  joinedRooms         UsersInRoom[] @relation("UserRooms")
+  hostedRooms         Room[]        @relation("RoomHost")
+  messages            Message[]
+  spotifyId           String?       @unique
+  spotifyAccessToken  String?
+  spotifyRefreshToken String?
+  spotifyDeviceId     String?
+  spotifyTokenExpiry  DateTime?
+
+  @@index([spotifyId])
 }
 
 model Room {
@@ -28,15 +32,18 @@ model Room {
   closedAt  DateTime?
   users     UsersInRoom[]
   hostId    String
-  host      User          @relation("RoomHost", fields: [hostId], references: [id])
+  host      User          @relation("RoomHost", fields: [hostId], references: [id], onDelete: Cascade)
   roomName  String?
-  messages  Message[] // Add relation to messages
+  messages  Message[]
+  expiresAt DateTime      @default(dbgenerated("NOW() + interval '1 hour'"))
+
+  @@index([expiresAt])
 }
 
 model UsersInRoom {
-  user     User      @relation(fields: [userId], references: [id])
+  user     User      @relation("UserRooms", fields: [userId], references: [id], onDelete: Cascade)
   userId   String
-  room     Room      @relation(fields: [roomId], references: [id])
+  room     Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
   roomId   String
   joinedAt DateTime  @default(now())
   leftAt   DateTime?
@@ -49,14 +56,14 @@ model Message {
   content   String
   type      String    @default("TEXT")
   createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt // Add updatedAt field
-  user      User      @relation(fields: [userId], references: [id])
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  room      Room      @relation(fields: [roomId], references: [id])
+  room      Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
   roomId    String
-  isEdited  Boolean   @default(false) // Add field to track edits
-  deletedAt DateTime? // Soft delete support
+  isEdited  Boolean   @default(false)
+  deletedAt DateTime?
 
-  @@index([roomId, createdAt]) // Add index for querying messages in a room
-  @@index([userId]) // Add index for querying user's messages
+  @@index([roomId, createdAt])
+  @@index([userId])
 }

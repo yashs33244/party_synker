@@ -5,6 +5,12 @@ interface UserJobData {
   mongoAuthId: string;
   email: string;
   name: string;
+  username?: string;
+  spotifyId?: string;
+  spotifyAccessToken?: string;
+  spotifyRefreshToken?: string;
+  spotifyDeviceId?: string;
+  isUpdate?: boolean;
 }
 
 interface UserJobResult {
@@ -57,39 +63,51 @@ queueEvents.on('failed', async ({ jobId, failedReason }) => {
 const worker = new Worker<UserJobData, UserJobResult>(
   QUEUE_NAME,
   async (job) => {
-    const { mongoAuthId, email, name } = job.data;
+    const { mongoAuthId, email, name, spotifyId, spotifyAccessToken, 
+            spotifyRefreshToken, spotifyDeviceId, isUpdate } = job.data;
 
     try {
-      const existingUser = await prisma.user.findUnique({
-        where: { mongoAuthId },
-      });
-
-      if (existingUser) {
-        throw new Error(`User with mongoAuthId ${mongoAuthId} already exists`);
+      if (isUpdate) {
+        return await prisma.user.update({
+          where: { mongoAuthId },
+          data: {
+            spotifyId,
+            spotifyAccessToken,
+            spotifyRefreshToken,
+            spotifyDeviceId
+          }
+        });
       }
 
-      const user = await prisma.user.create({
-        data: {
+      const user = await prisma.user.upsert({
+        where: { mongoAuthId },
+        update: {
+          spotifyId,
+          spotifyAccessToken,
+          spotifyRefreshToken,
+          spotifyDeviceId
+        },
+        create: {
           mongoAuthId,
           email,
           name,
-        },
+          spotifyId,
+          spotifyAccessToken,
+          spotifyRefreshToken,
+          spotifyDeviceId
+        }
       });
 
       await job.updateProgress(100);
       return user;
     } catch (error) {
-      console.error('Error processing user creation job:', {
-        jobId: job.id,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        data: job.data,
-      });
+      console.error('Error processing user job:', error);
       throw error;
     }
   },
   {
     connection: redisConfig,
-    concurrency: 5,
+    concurrency: 5
   }
 );
 

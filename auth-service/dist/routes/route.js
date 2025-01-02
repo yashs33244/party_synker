@@ -8,7 +8,9 @@ const express_1 = __importDefault(require("express"));
 const login_1 = require("../controller/login");
 const signup_1 = require("../controller/signup");
 exports.router = express_1.default.Router();
-exports.router.post("/signup", signup_1.createUser);
+exports.router.post('/signup', signup_1.createUser);
+exports.router.get('/spotify', signup_1.initiateSpotifyAuth);
+exports.router.get('/spotify/callback', signup_1.handleSpotifyCallback);
 exports.router.post("/login", login_1.login);
 exports.router.get("/logout", (req, res) => {
     res.clearCookie("token");

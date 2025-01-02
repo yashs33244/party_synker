@@ -52,35 +52,47 @@ queueEvents.on('failed', (_a) => __awaiter(void 0, [_a], void 0, function* ({ jo
     console.error(`Job ${jobId} failed:`, failedReason);
 }));
 const worker = new bullmq_1.Worker(QUEUE_NAME, (job) => __awaiter(void 0, void 0, void 0, function* () {
-    const { mongoAuthId, email, name } = job.data;
+    const { mongoAuthId, email, name, spotifyId, spotifyAccessToken, spotifyRefreshToken, spotifyDeviceId, isUpdate } = job.data;
     try {
-        const existingUser = yield prisma_1.default.user.findUnique({
-            where: { mongoAuthId },
-        });
-        if (existingUser) {
-            throw new Error(`User with mongoAuthId ${mongoAuthId} already exists`);
+        if (isUpdate) {
+            return yield prisma_1.default.user.update({
+                where: { mongoAuthId },
+                data: {
+                    spotifyId,
+                    spotifyAccessToken,
+                    spotifyRefreshToken,
+                    spotifyDeviceId
+                }
+            });
         }
-        const user = yield prisma_1.default.user.create({
-            data: {
+        const user = yield prisma_1.default.user.upsert({
+            where: { mongoAuthId },
+            update: {
+                spotifyId,
+                spotifyAccessToken,
+                spotifyRefreshToken,
+                spotifyDeviceId
+            },
+            create: {
                 mongoAuthId,
                 email,
                 name,
-            },
+                spotifyId,
+                spotifyAccessToken,
+                spotifyRefreshToken,
+                spotifyDeviceId
+            }
         });
         yield job.updateProgress(100);
         return user;
     }
     catch (error) {
-        console.error('Error processing user creation job:', {
-            jobId: job.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            data: job.data,
-        });
+        console.error('Error processing user job:', error);
         throw error;
     }
 }), {
     connection: redisConfig,
-    concurrency: 5,
+    concurrency: 5
 });
 function cleanupQueues() {
     return __awaiter(this, void 0, void 0, function* () {

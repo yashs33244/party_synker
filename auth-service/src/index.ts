@@ -3,6 +3,7 @@ import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import { Connection } from "./db/connection";
 
+
 import dotenv from "dotenv";
 dotenv.config();
 const app = express();
@@ -26,7 +27,7 @@ app.use((req, res, next) => {
   // Pass to next layer of middleware
   next();
 });
-app.use("/api", router);
+app.use("/api/auth", router);
 app.listen(PORT, () => {
   console.log(`Server is running on PORT ${PORT}`);
 });
