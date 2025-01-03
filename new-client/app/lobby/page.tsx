@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export interface OutgoingMessage {
@@ -12,7 +12,8 @@ export interface OutgoingMessage {
     | "ERROR"
     | "USER_JOINED"
     | "USER_LEFT"
-    | "MESSAGE_SENT";
+    | "MESSAGE_SENT"
+    | "ROOM_HISTORY";
   payload: any;
 }
 
@@ -66,70 +67,99 @@ export default function LobbyPage() {
   const searchParams = useSearchParams();
   const userId = searchParams.get("userid");
 
+  const handleServerMessage = useCallback(
+    (data: OutgoingMessage) => {
+      console.log("Received message:", data);
+
+      switch (data.type) {
+        case "ROOM_CREATED":
+          setLoading(false);
+          if (data.payload.roomId) {
+            router.push(`/room?id=${data.payload.roomId}&userid=${userId}`);
+          } else {
+            setError("Invalid room ID received");
+          }
+          break;
+        case "USER_JOINED":
+        case "ROOM_JOINED":
+          setLoading(false);
+          if (data.payload.roomId) {
+            router.push(`/room?id=${data.payload.roomId}&userid=${userId}`);
+          } else {
+            setError("Invalid room ID received");
+          }
+          break;
+        case "ERROR":
+          setLoading(false);
+          setError(data.payload.message);
+          break;
+        default:
+          console.log("Unhandled message type:", data.type);
+      }
+    },
+    [userId, router]
+  );
+
   useEffect(() => {
     if (!userId) {
       setError("User ID is required");
       return;
     }
 
-    const wsConnection = new WebSocket(`ws://localhost:4000?userId=${userId}`);
+    let wsConnection: WebSocket;
+    let reconnectTimeout: NodeJS.Timeout;
 
-    wsConnection.onopen = () => {
-      console.log("Connected to WebSocket server");
-      setWs(wsConnection);
-      setIsConnected(true);
-      setError(null);
-    };
+    const connectWebSocket = () => {
+      wsConnection = new WebSocket(`ws://localhost:4000?userId=${userId}`);
 
-    wsConnection.onmessage = (event) => {
-      try {
-        const data: OutgoingMessage = JSON.parse(event.data);
-        console.log("Received message:", data);
+      wsConnection.onopen = () => {
+        console.log("Connected to WebSocket server");
+        setWs(wsConnection);
+        setIsConnected(true);
+        setError(null);
+      };
 
-        switch (data.type) {
-          case "ROOM_CREATED":
-            setLoading(false);
-            // Redirect to room page with both room ID and user ID
-            router.push(`/room?id=${data.payload.roomId}&userid=${userId}`);
-            break;
-          case "ROOM_JOINED":
-            setLoading(false);
-            // Redirect to room page with both room ID and user ID
-            router.push(`/room?id=${data.payload.roomId}&userid=${userId}`);
-            break;
-          case "ERROR":
-            setLoading(false);
-            setError(data.payload.message);
-            break;
+      wsConnection.onmessage = (event) => {
+        try {
+          const data: OutgoingMessage = JSON.parse(event.data);
+          handleServerMessage(data);
+        } catch (err) {
+          console.error("Error processing message:", err);
+          setError("Failed to process server response");
+          setLoading(false);
         }
-      } catch (err) {
-        console.error("Error processing message:", err);
-        setError("Failed to process server response");
+      };
+
+      wsConnection.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        setError("Failed to connect to server");
         setLoading(false);
-      }
+        setIsConnected(false);
+      };
+
+      wsConnection.onclose = () => {
+        console.log("Disconnected from WebSocket server");
+        setIsConnected(false);
+        setWs(null);
+
+        // Attempt to reconnect after 3 seconds
+        reconnectTimeout = setTimeout(connectWebSocket, 3000);
+      };
     };
 
-    wsConnection.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      setError("Failed to connect to server");
-      setLoading(false);
-      setIsConnected(false);
-    };
-
-    wsConnection.onclose = () => {
-      console.log("Disconnected from WebSocket server");
-      setIsConnected(false);
-      setWs(null);
-    };
+    connectWebSocket();
 
     return () => {
       if (wsConnection) {
         wsConnection.close();
       }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
     };
-  }, [userId, router]);
+  }, [userId, handleServerMessage]);
 
-  const createRoom = () => {
+  const createRoom = async () => {
     if (!ws || !isConnected || !userId) return;
     setLoading(true);
     setError(null);
@@ -138,16 +168,23 @@ export default function LobbyPage() {
       type: "CREATE_ROOM",
       payload: {
         hostId: userId,
-        roomName: roomName || `Room-${Math.random().toString(36).substr(2, 6)}`,
-      } as CreateRoomPayload,
+        roomName:
+          roomName.trim() || `Room-${Math.random().toString(36).substr(2, 6)}`,
+      },
     };
 
-    ws.send(JSON.stringify(createRoomMessage));
+    try {
+      ws.send(JSON.stringify(createRoomMessage));
+    } catch (err) {
+      console.error("Error sending create room message:", err);
+      setError("Failed to create room");
+      setLoading(false);
+    }
   };
 
-  const joinRoom = (e: React.FormEvent) => {
+  const joinRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ws || !isConnected || !roomId || !userId) return;
+    if (!ws || !isConnected || !roomId.trim() || !userId) return;
     setLoading(true);
     setError(null);
 
@@ -155,11 +192,17 @@ export default function LobbyPage() {
       type: "JOIN_ROOM",
       payload: {
         userId: userId,
-        roomId: roomId,
-      } as JoinRoomPayload,
+        roomId: roomId.trim(),
+      },
     };
 
-    ws.send(JSON.stringify(joinRoomMessage));
+    try {
+      ws.send(JSON.stringify(joinRoomMessage));
+    } catch (err) {
+      console.error("Error sending join room message:", err);
+      setError("Failed to join room");
+      setLoading(false);
+    }
   };
 
   if (!userId) {
@@ -177,7 +220,9 @@ export default function LobbyPage() {
       <h1 className="text-3xl font-bold mb-8">Party Synker Lobby</h1>
 
       {!isConnected && (
-        <div className="mb-4 text-yellow-300">Connecting to server...</div>
+        <div className="mb-4 text-yellow-300 bg-yellow-900/50 px-4 py-2 rounded">
+          Connecting to server...
+        </div>
       )}
 
       {error && (
@@ -225,7 +270,7 @@ export default function LobbyPage() {
           />
           <button
             type="submit"
-            disabled={loading || !isConnected || !roomId}
+            disabled={loading || !isConnected || !roomId.trim()}
             className="w-full bg-white text-purple-600 px-4 py-2 rounded font-semibold hover:bg-opacity-90 transition disabled:opacity-50"
           >
             {loading ? "Joining..." : "Join Room"}
