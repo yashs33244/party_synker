@@ -15,26 +15,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createUser = void 0;
 const auth_service_1 = require("../services/auth.service");
 const schema_1 = __importDefault(require("../db/schema"));
-const shared_db_1 = __importDefault(require("../../../shared-db"));
 const authService = new auth_service_1.AuthService();
 const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { email, password, name, username } = req.body;
-        if (!(email && password && name && username)) {
-            return res.status(400).json({ message: "All input is required" });
+        if (!(req.body.email && req.body.password && req.body.name && req.body.username)) {
+            return res.status(400).send("All input is required");
         }
-        const oldUser = yield schema_1.default.findOne({ email });
+        const oldUser = yield schema_1.default.findOne({ email: req.body.email });
         if (oldUser) {
-            return res.status(409).json({ message: "User Already Exist. Please Login" });
+            return res.status(409).send("User Already Exist. Please Login");
         }
         const { mongoUser, token } = yield authService.createUser({
-            email,
-            password,
-            name,
-            username,
-        });
-        let maindbUser = yield shared_db_1.default.user.findUnique({
-            where: { email },
+            email: req.body.email,
+            password: req.body.password,
+            name: req.body.name,
+            username: req.body.username
         });
         res.cookie("token", token, {
             path: "/",
@@ -43,9 +38,7 @@ const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             httpOnly: true,
             sameSite: "none",
         });
-        const userid = maindbUser === null || maindbUser === void 0 ? void 0 : maindbUser.id;
         res.json({
-            userid: userid,
             user: mongoUser,
         });
     }
