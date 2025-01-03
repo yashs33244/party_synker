@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import User  from "../db/schema/index";
 import bcrypt from "bcrypt";    
+import prisma from "../../../shared-db";
 
 import {createSecretToken} from "../utils/generateToken"
 
@@ -14,6 +15,11 @@ export const login = async (req:Request, res:Response) => {
     return res.status(404).json({ message: "Invalid credentials" });
   }
   const token = createSecretToken(user._id);
+  const maindbUser = await prisma.user.findUnique({
+    where: {
+      email: email
+    }
+  })
   res.cookie("token", token, {
     domain: process.env.frontend_url, // Set your domain here
     path: "/", // Cookie is accessible from all paths
@@ -22,6 +28,7 @@ export const login = async (req:Request, res:Response) => {
     httpOnly: true, // Cookie cannot be accessed via client-side scripts
     sameSite: "none",
   });
-
-  res.json({ token });
+  //@ts-ignore
+  const userid = maindbUser.id;
+  res.json({ userid,token });
 };

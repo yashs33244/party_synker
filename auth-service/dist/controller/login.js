@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.login = void 0;
 const index_1 = __importDefault(require("../db/schema/index"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const shared_db_1 = __importDefault(require("../../../shared-db"));
 const generateToken_1 = require("../utils/generateToken");
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = req.body;
@@ -26,6 +27,11 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         return res.status(404).json({ message: "Invalid credentials" });
     }
     const token = (0, generateToken_1.createSecretToken)(user._id);
+    const maindbUser = yield shared_db_1.default.user.findUnique({
+        where: {
+            email: email
+        }
+    });
     res.cookie("token", token, {
         domain: process.env.frontend_url, // Set your domain here
         path: "/", // Cookie is accessible from all paths
@@ -34,6 +40,8 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         httpOnly: true, // Cookie cannot be accessed via client-side scripts
         sameSite: "none",
     });
-    res.json({ token });
+    //@ts-ignore
+    const userid = maindbUser.id;
+    res.json({ userid, token });
 });
 exports.login = login;

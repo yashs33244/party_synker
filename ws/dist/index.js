@@ -86,7 +86,7 @@ wss.on('connection', (ws, req) => __awaiter(void 0, void 0, void 0, function* ()
         ws.close(4000, 'Connection error');
     }
 }));
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
     console.log(`WebSocket server is running on port ${PORT}`);
 });
