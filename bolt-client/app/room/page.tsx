@@ -178,7 +178,14 @@ export default function Room() {
         </div>
 
         <div className="mb-4">
-          <MusicPlayer isHost={isHost} roomId={roomId} userId={userId} />
+          {/* <MusicPlayer defaultSongUrl="https://songlist.s3.eu-north-1.amazonaws.com/believer.mp3" /> */}
+
+          <MusicPlayer
+            songUrl="https://songlist.s3.eu-north-1.amazonaws.com/believer.mp3"
+            roomId={roomId}
+            userId={userId}
+            wsClient={wsClient}
+          />
         </div>
 
         <div className="flex-1 flex gap-4">

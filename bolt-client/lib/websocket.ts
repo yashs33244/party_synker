@@ -28,7 +28,11 @@ class WebSocketClient {
       console.log('WebSocket connected');
       this.reconnectAttempts = 0;
     };
+    this.ws.addEventListener('close', () => {
+      this.reconnectAttempts = 0;
+    });
   }
+  
 
   private handleMessage(event: MessageEvent) {
     try {

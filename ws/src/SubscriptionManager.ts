@@ -1,10 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import { UserManager } from './UserManager';
 import { OutgoingMessage } from './types/out';
-import { CloseRoomPayload, CreateRoomPayload, JoinRoomPayload, LeaveRoomPayload, UserMessagePayload } from './types/in';
+import { CloseRoomPayload, CreateRoomPayload, JoinRoomPayload, LeaveRoomPayload, MusicLoadedPayload, MusicPlayPayload, UserMessagePayload } from './types/in';
 
 export class SubscriptionManager {
   constructor(
+    private loadedUsers: Map<string, Set<string>> = new Map(),
     private prisma: PrismaClient,
     private userManager: UserManager
   ) {}
@@ -255,5 +256,41 @@ export class SubscriptionManager {
     });
 
     return users.map((u:any) => u.userId);
+  }
+  async handleMusicLoaded({ roomId, userId }: MusicLoadedPayload) {
+    if (!this.loadedUsers.has(roomId)) {
+      this.loadedUsers.set(roomId, new Set());
+    }
+    
+    const loadedUsersInRoom = this.loadedUsers.get(roomId)!;
+    loadedUsersInRoom.add(userId);
+    
+    const roomUsers = this.userManager.getRoomUsers(roomId);
+    
+    // If all users have loaded, broadcast play command
+    if (loadedUsersInRoom.size === roomUsers.size) {
+      this.loadedUsers.delete(roomId);
+      
+      const playTimestamp = Date.now() + 1000; // Play in 1 second
+      this.userManager.broadcast(roomId, {
+        type: 'MUSIC_COMMAND',
+        payload: {
+          command: 'PLAY',
+          timestamp: playTimestamp
+        }
+      });
+    }
+  }
+
+  async handleMusicPlay({ roomId, songUrl }: MusicPlayPayload) {
+    this.loadedUsers.delete(roomId);
+    
+    this.userManager.broadcast(roomId, {
+      type: 'MUSIC_COMMAND',
+      payload: {
+        command: 'LOAD',
+        songUrl
+      }
+    });
   }
 }

@@ -1,6 +1,6 @@
 // src/types/in.ts
 export interface IncomingMessage {
-    type: 'JOIN_ROOM' | 'LEAVE_ROOM' | 'CREATE_ROOM' | 'CLOSE_ROOM' | 'USER_MESSAGE' | 'GET_USERS';
+    type: 'JOIN_ROOM' | 'LEAVE_ROOM' | 'CREATE_ROOM' | 'CLOSE_ROOM' | 'USER_MESSAGE' | 'GET_USERS' | 'MUSIC_LOADED' | 'MUSIC_PLAY';
     payload: any;
   }
   
@@ -31,3 +31,16 @@ export interface IncomingMessage {
     messageType?: 'TEXT' | 'ACTION'; // can be extended for different message types
     timestamp?: Date;
   }
+
+  export interface MusicLoadedPayload {
+    type: 'MUSIC_LOADED';
+    roomId: string;
+    userId: string;
+  }
+  
+  export interface MusicPlayPayload {
+    type: 'MUSIC_PLAY';
+    roomId: string;
+    songUrl: string;
+  }
+  

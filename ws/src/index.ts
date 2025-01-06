@@ -12,7 +12,7 @@ import { parse } from 'url';
   
   
   const userManager = new UserManager();
-  const subscriptionManager = new SubscriptionManager(prisma, userManager);
+  const subscriptionManager = new SubscriptionManager(new Map<string, any>(), prisma, userManager);
   
   const server = createServer();
   const wss = new WebSocketServer({ server });
@@ -90,6 +90,12 @@ import { parse } from 'url';
               break;
             case 'GET_USERS':
               await subscriptionManager.handleGetUsers(message.payload);
+              break;
+            case 'MUSIC_LOADED':
+              await subscriptionManager.handleMusicLoaded(message.payload);
+              break;
+            case 'MUSIC_PLAY':
+              await subscriptionManager.handleMusicPlay(message.payload);
               break;
           }
         } catch (error:any) {

@@ -21,7 +21,7 @@ const SubscriptionManager_1 = require("./SubscriptionManager");
 const shared_db_1 = __importDefault(require("../../shared-db"));
 const url_1 = require("url");
 const userManager = new UserManager_1.UserManager();
-const subscriptionManager = new SubscriptionManager_1.SubscriptionManager(shared_db_1.default, userManager);
+const subscriptionManager = new SubscriptionManager_1.SubscriptionManager(new Map(), shared_db_1.default, userManager);
 const server = (0, http_1.createServer)();
 const wss = new ws_1.WebSocketServer({ server });
 wss.on('connection', (ws, req) => __awaiter(void 0, void 0, void 0, function* () {
@@ -84,6 +84,12 @@ wss.on('connection', (ws, req) => __awaiter(void 0, void 0, void 0, function* ()
                         break;
                     case 'GET_USERS':
                         yield subscriptionManager.handleGetUsers(message.payload);
+                        break;
+                    case 'MUSIC_LOADED':
+                        yield subscriptionManager.handleMusicLoaded(message.payload);
+                        break;
+                    case 'MUSIC_PLAY':
+                        yield subscriptionManager.handleMusicPlay(message.payload);
                         break;
                 }
             }

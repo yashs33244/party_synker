@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Play Song</title>
+</head>
+<body>
+    <h1>Play Song</h1>
+    <audio id="audioPlayer" controls></audio>
+    <p id="loadTime"></p>
+
+    <script>
+        const audioPlayer = document.getElementById('audioPlayer');
+        const loadTimeElement = document.getElementById('loadTime');
+        const audioUrl = "https://party-sync.s3.eu-north-1.amazonaws.com/song.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAXKPUZWWEADZDL4VP%2F20250106%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Date=20250106T093836Z&X-Amz-Expires=300&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFkaCmV1LW5vcnRoLTEiRzBFAiAiIFuxOb8ArpLSkf%2FccpOfIOL0LAWFyPLipw4fwXtJRAIhAOY%2FGN8X2tz3AJOL%2FWOqlfgSnH8gx2ns%2B%2BOb4W1CzuiFKugCCEMQABoMNTAzNTYxNDM0NTA0Igw0Cgc0KilsoDLY8GAqxQJuMW1KNa5pLFOceHZUL3fzcsKOVyoIT8le6yKIpgAe8FyzDUQbiCUwyt7dkVa1ZLzwTW1TYidVWo9agJWULHysh9FQTrgWY6nfYfI6MY5PsLCRJ5u%2BwX%2BofXUdPPcUWDUM2SRVXdAaxApj2aSk1vLFOyjW4eEhUilqtoSXG1TiY7K9te6JZZgeREKt8E0RrG7e2yYfIRJ8h3hAuxm1r4z28CmOh0hGXSkshoiCXY0JgvT0FZYsCFSfZbLGySZi5zZR8eVKEw5AwPwiF4uvGwp1I8WCg7fA2PpYxbECJVJtCxIikJ9viA9gKFIDXFDz274LEemJZ6tQmqNaVTV%2BXveRvEmjK2vPM6IH0phdILLz%2FXfXsiuk1iyBzrzaCrES9UTx9ikGgKSfQxvj1jg2Q%2B5grT8SNC51Dbojd%2FBLcI%2B0cGSqKs9rMInH7rsGOrMCVEZ0anlCa%2FdiQhOgan2JnnmJeDxafPXsnk0fR50dj4i2dMT%2BT368TaiFeuL%2BSaSipcKYlIU3ZASYxw5jMVOK7mNmb3mmduc%2F8FX3KyIjWITH0ZEBI5vie%2B0y7PMfHZsif%2FhIbxDdQSEre9pWDl3Q1VkGHcA0rbUa1kzZ7X79C5l6PKMzvk6uduLTtZbDH3G2aIN78Vi17yZWcXywRXI4TmaFCBm%2FFUi2q3GvMMyM%2FakAPXpVM8njkvhq975RYM%2FeikXLh2PCYCMqKdiasZIfYj4MaWNfUX2Y4UAgrinJFb1u6xS4Ng%2BGyyA46%2FX73aAI6vFmzXy1D6mcvd6nIIFmPOfMHC4c94kjmmsLLUDtFxymaTRnq0NXgM2uoFDvzKEfCWghmnSSpam1tfMQ9lt3%2FL3TUw%3D%3D&X-Amz-Signature=6a2e71d31824c3d78c32d834ca97c6732f9931050f1877428458d83949e003b7&X-Amz-SignedHeaders=host&response-content-disposition=inline";
+
+        let startTime = Date.now();
+
+        // Set the source of the audio
+        audioPlayer.src = audioUrl;
+
+        // Event to measure load time
+        audioPlayer.addEventListener('loadeddata', () => {
+            let loadTime = (Date.now() - startTime) / 1000; // in seconds
+            loadTimeElement.innerText = `Load Time: ${loadTime} seconds`;
+            audioPlayer.play();
+        });
+
+        // Error handling
+        audioPlayer.addEventListener('error', () => {
+            loadTimeElement.innerText = "Failed to load the song.";
+        });
+    </script>
+</body>
+</html>

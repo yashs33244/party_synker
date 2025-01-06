@@ -11,7 +11,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SubscriptionManager = void 0;
 class SubscriptionManager {
-    constructor(prisma, userManager) {
+    constructor(loadedUsers = new Map(), prisma, userManager) {
+        this.loadedUsers = loadedUsers;
         this.prisma = prisma;
         this.userManager = userManager;
     }
@@ -22,15 +23,7 @@ class SubscriptionManager {
             if (!user) {
                 throw new Error('User not found');
             }
-            // delete user in room
-            yield this.prisma.usersInRoom.delete({
-                where: {
-                    userId_roomId: {
-                        userId,
-                        roomId
-                    }
-                }
-            });
+            // delete users in room
             this.userManager.removeUserFromRoom(userId, roomId);
             const message = {
                 type: 'ROOM_LEFT',
@@ -240,6 +233,49 @@ class SubscriptionManager {
                 select: { userId: true }
             });
             return users.map((u) => u.userId);
+        });
+    }
+    handleMusicLoaded(payload) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const { roomId, userId } = payload;
+            // Initialize set of loaded users for this room if it doesn't exist
+            if (!this.loadedUsers.has(roomId)) {
+                this.loadedUsers.set(roomId, new Set());
+            }
+            // Add this user to the set of loaded users
+            const loadedUsersInRoom = this.loadedUsers.get(roomId);
+            loadedUsersInRoom.add(userId);
+            // Get all users in the room
+            const roomUsers = this.userManager.getRoomUsers(roomId);
+            // If all users have loaded, broadcast play command
+            if (loadedUsersInRoom.size === roomUsers.size) {
+                // Clear loaded users for next song
+                this.loadedUsers.delete(roomId);
+                // Broadcast play command with timestamp
+                const playTimestamp = Date.now() + 1000; // Play in 1 second
+                this.userManager.broadcast(roomId, {
+                    type: 'MUSIC_COMMAND',
+                    payload: {
+                        command: 'PLAY',
+                        timestamp: playTimestamp
+                    }
+                });
+            }
+        });
+    }
+    handleMusicPlay(payload) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const { roomId, songUrl } = payload;
+            // Clear any existing loaded users for this room
+            this.loadedUsers.delete(roomId);
+            // Broadcast load command to all users
+            this.userManager.broadcast(roomId, {
+                type: 'MUSIC_COMMAND',
+                payload: {
+                    command: 'LOAD',
+                    songUrl
+                }
+            });
         });
     }
 }
