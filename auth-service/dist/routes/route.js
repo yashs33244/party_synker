@@ -8,7 +8,9 @@ const express_1 = __importDefault(require("express"));
 const login_1 = require("../controller/login");
 const signup_1 = require("../controller/signup");
 exports.router = express_1.default.Router();
+//@ts-ignore
 exports.router.post("/signup", signup_1.createUser);
+//@ts-ignore
 exports.router.post("/login", login_1.login);
 exports.router.get("/logout", (req, res) => {
     res.clearCookie("token");
