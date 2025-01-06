@@ -15,28 +15,6 @@ class SubscriptionManager {
         this.prisma = prisma;
         this.userManager = userManager;
     }
-    handleJoinRoom(payload) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { userId, roomId } = payload;
-            const user = this.userManager.getUser(userId);
-            if (!user) {
-                throw new Error('User not found');
-            }
-            yield this.prisma.usersInRoom.create({
-                data: {
-                    userId,
-                    roomId,
-                    joinedAt: new Date(),
-                },
-            });
-            user.addRoom(roomId);
-            const message = {
-                type: 'ROOM_JOINED',
-                payload: { userId, roomId },
-            };
-            this.userManager.broadcast(roomId, message);
-        });
-    }
     handleLeaveRoom(payload) {
         return __awaiter(this, void 0, void 0, function* () {
             const { userId, roomId } = payload;
@@ -44,18 +22,16 @@ class SubscriptionManager {
             if (!user) {
                 throw new Error('User not found');
             }
-            yield this.prisma.usersInRoom.update({
+            // delete user in room
+            yield this.prisma.usersInRoom.delete({
                 where: {
                     userId_roomId: {
                         userId,
-                        roomId,
-                    },
-                },
-                data: {
-                    leftAt: new Date(),
-                },
+                        roomId
+                    }
+                }
             });
-            user.removeRoom(roomId);
+            this.userManager.removeUserFromRoom(userId, roomId);
             const message = {
                 type: 'ROOM_LEFT',
                 payload: { userId, roomId },
@@ -66,14 +42,12 @@ class SubscriptionManager {
     handleCreateRoom(payload) {
         return __awaiter(this, void 0, void 0, function* () {
             const { hostId, roomName } = payload;
-            // First verify if the user exists
             const user = yield this.prisma.user.findUnique({
                 where: { id: hostId }
             });
             if (!user) {
                 throw new Error('Host user not found');
             }
-            // Create the room with proper host connection
             const room = yield this.prisma.room.create({
                 data: {
                     roomName,
@@ -82,7 +56,6 @@ class SubscriptionManager {
                             id: hostId
                         }
                     },
-                    // Also create the initial UsersInRoom entry for the host
                     users: {
                         create: {
                             userId: hostId,
@@ -95,11 +68,10 @@ class SubscriptionManager {
                     users: true
                 }
             });
-            // Add the room to the WebSocket user if they're connected
+            // Explicitly add user to room in UserManager
+            this.userManager.addUserToRoom(hostId, room.id);
             const wsUser = this.userManager.getUser(hostId);
             if (wsUser) {
-                wsUser.addRoom(room.id);
-                // Notify the user that the room was created
                 wsUser.send({
                     type: 'ROOM_CREATED',
                     payload: {
@@ -110,6 +82,64 @@ class SubscriptionManager {
                 });
             }
             return room;
+        });
+    }
+    handleJoinRoom(payload) {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a;
+            const { userId, roomId } = payload;
+            const user = this.userManager.getUser(userId);
+            if (!user) {
+                throw new Error('User not found');
+            }
+            const room = yield this.prisma.room.findUnique({
+                where: { id: roomId }
+            });
+            if (!room) {
+                throw new Error('Room not found');
+            }
+            const existingUserInRoom = yield this.prisma.usersInRoom.findUnique({
+                where: {
+                    userId_roomId: {
+                        userId,
+                        roomId
+                    }
+                }
+            });
+            if (existingUserInRoom && !existingUserInRoom.leftAt) {
+                throw new Error('User is already in this room');
+            }
+            yield this.prisma.usersInRoom.upsert({
+                where: {
+                    userId_roomId: {
+                        userId,
+                        roomId
+                    }
+                },
+                update: {
+                    joinedAt: new Date(),
+                    leftAt: null
+                },
+                create: {
+                    userId,
+                    roomId,
+                    joinedAt: new Date()
+                }
+            });
+            // Add user to room in UserManager
+            this.userManager.addUserToRoom(userId, roomId);
+            const message = {
+                type: 'ROOM_JOINED',
+                payload: {
+                    userId,
+                    roomId,
+                    userName: (_a = (yield this.prisma.user.findUnique({
+                        where: { id: userId },
+                        select: { name: true }
+                    }))) === null || _a === void 0 ? void 0 : _a.name
+                },
+            };
+            this.userManager.broadcast(roomId, message);
         });
     }
     handleCloseRoom(payload) {
@@ -136,12 +166,10 @@ class SubscriptionManager {
         return __awaiter(this, void 0, void 0, function* () {
             var _a;
             const { roomId, userId, message, messageType = 'TEXT' } = payload;
-            // Verify user exists
             const user = this.userManager.getUser(userId);
             if (!user) {
                 throw new Error('User not found');
             }
-            // Verify user is in the room
             const userInRoom = yield this.prisma.usersInRoom.findUnique({
                 where: {
                     userId_roomId: {
@@ -157,13 +185,19 @@ class SubscriptionManager {
                 throw new Error('User is not in this room');
             }
             if (userInRoom.leftAt) {
+                yield this.prisma.usersInRoom.delete({
+                    where: {
+                        userId_roomId: {
+                            userId,
+                            roomId
+                        }
+                    }
+                });
                 throw new Error('User has left this room');
             }
             if (userInRoom.room.closedAt) {
                 throw new Error('Room is closed');
             }
-            // You might want to store messages in database
-            // If you want to add a Messages table to your schema, you can do:
             const savedMessage = yield this.prisma.message.create({
                 data: {
                     content: message,
@@ -172,7 +206,6 @@ class SubscriptionManager {
                     roomId,
                 }
             });
-            // Prepare the outgoing message
             const outgoingMessage = {
                 type: 'USER_MESSAGE',
                 payload: {
@@ -181,24 +214,32 @@ class SubscriptionManager {
                     message,
                     messageType,
                     timestamp: new Date().toISOString(),
-                    // You might want to include additional user info
                     userName: (_a = (yield this.prisma.user.findUnique({
                         where: { id: userId },
                         select: { name: true }
                     }))) === null || _a === void 0 ? void 0 : _a.name
                 }
             };
-            // Broadcast the message to all users in the room except the sender
+            console.log('Current users in UserManager:', Array.from(this.userManager.getUsers().keys()));
             this.userManager.broadcast(roomId, outgoingMessage, userId);
-            // Also send confirmation back to the sender
             user.send({
                 type: 'MESSAGE_SENT',
                 payload: {
-                    messageId: Date.now().toString(), // or use savedMessage.id if storing in DB
+                    messageId: savedMessage.id,
                     timestamp: new Date().toISOString()
                 }
             });
             return outgoingMessage;
+        });
+    }
+    handleGetUsers(payload) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const { roomId } = payload;
+            const users = yield this.prisma.usersInRoom.findMany({
+                where: { roomId },
+                select: { userId: true }
+            });
+            return users.map((u) => u.userId);
         });
     }
 }

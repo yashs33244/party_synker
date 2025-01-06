@@ -1,6 +1,6 @@
 // src/types/in.ts
 export interface IncomingMessage {
-    type: 'JOIN_ROOM' | 'LEAVE_ROOM' | 'CREATE_ROOM' | 'CLOSE_ROOM' | 'USER_MESSAGE';
+    type: 'JOIN_ROOM' | 'LEAVE_ROOM' | 'CREATE_ROOM' | 'CLOSE_ROOM' | 'USER_MESSAGE' | 'GET_USERS';
     payload: any;
   }
   

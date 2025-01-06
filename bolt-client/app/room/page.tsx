@@ -1,12 +1,11 @@
 "use client";
-
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { wsClient } from "@/lib/websocket";
-import { ArrowLeft, MessageCircle, Send, User, Music } from "lucide-react";
+import { ArrowLeft, Music, Send, User } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -15,10 +14,29 @@ import { MusicPlayer } from "@/components/MusicPlayer";
 interface Message {
   id: string;
   userId: string;
-  username: string;
-  content: string;
-  timestamp: Date;
+  userName: string;
+  message: string;
+  timestamp: string;
 }
+
+const getUserColor = (userId: string) => {
+  const colors = [
+    "bg-blue-500",
+    "bg-green-500",
+    "bg-purple-500",
+    "bg-yellow-500",
+    "bg-pink-500",
+    "bg-indigo-500",
+    "bg-red-500",
+    "bg-teal-500",
+  ];
+
+  const hash = userId.split("").reduce((acc, char) => {
+    return char.charCodeAt(0) + ((acc << 5) - acc);
+  }, 0);
+
+  return colors[Math.abs(hash) % colors.length];
+};
 
 export default function Room() {
   const searchParams = useSearchParams();
@@ -26,14 +44,51 @@ export default function Room() {
   const roomId = searchParams.get("id");
   const userId = searchParams.get("userid");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [receivedMessages, setReceivedMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isHost, setIsHost] = useState(false);
-  const [participants] = useState([
-    { id: "1", name: "John Doe" },
-    { id: "2", name: "Jane Smith" },
-    { id: "3", name: "Bob Johnson" },
-  ]);
+  const [hostMessages, setHostMessages] = useState<Message[]>([]);
+  const [participants, setParticipants] = useState<
+    { id: string; name: string }[]
+  >([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messageHandlerSet = useRef(false);
+
+  const handleWebSocketMessage = (event: any) => {
+    const message = typeof event === "string" ? JSON.parse(event) : event;
+    console.log("Received WebSocket message:", message);
+
+    switch (message.type) {
+      case "GET_USERS":
+        setParticipants(message.payload.users || []);
+        break;
+      case "ROOM_JOINED":
+        setIsHost(message.payload.isHost);
+        break;
+      case "USER_MESSAGE":
+        const newMsg = {
+          id: message.payload.messageId || Date.now().toString(),
+          userId: message.payload.userId,
+          userName: message.payload.userName || "Unknown User",
+          message: message.payload.message,
+          timestamp: message.payload.timestamp || new Date().toISOString(),
+        };
+
+        setReceivedMessages((prev) => {
+          // Check if message already exists
+          const exists = prev.some(
+            (m) =>
+              m.message === newMsg.message &&
+              m.userId === newMsg.userId &&
+              m.timestamp === newMsg.timestamp
+          );
+
+          if (exists) return prev;
+          return [...prev, newMsg];
+        });
+        break;
+    }
+  };
 
   useEffect(() => {
     if (!userId || !roomId) {
@@ -41,40 +96,24 @@ export default function Room() {
       return;
     }
 
-    wsClient.connect(userId);
+    if (!messageHandlerSet.current) {
+      wsClient.connect(userId);
 
-    wsClient.send({
-      type: "JOIN_ROOM",
-      payload: { roomId, userId },
-    });
-
-    wsClient.onMessage((message) => {
-      switch (message.type) {
-        case "ROOM_JOINED":
-          setIsHost(message.payload.isHost);
-          break;
-        case "USER_MESSAGE":
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: Math.random().toString(),
-              userId: message.payload.userId,
-              username: "User",
-              content: message.payload.message,
-              timestamp: new Date(),
-            },
-          ]);
-          break;
-      }
-    });
-
-    return () => {
+      // Join room
       wsClient.send({
-        type: "LEAVE_ROOM",
+        type: "JOIN_ROOM",
         payload: { roomId, userId },
       });
-      wsClient.disconnect();
-    };
+
+      // Get initial users list
+      wsClient.send({
+        type: "GET_USERS",
+        payload: { roomId },
+      });
+
+      wsClient.onMessage(handleWebSocketMessage);
+      messageHandlerSet.current = true;
+    }
   }, [roomId, userId, router]);
 
   useEffect(() => {
@@ -95,6 +134,16 @@ export default function Room() {
         message: newMessage,
       },
     });
+    setHostMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        userId,
+        userName: "You",
+        message: newMessage,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
 
     setNewMessage("");
   };
@@ -102,6 +151,13 @@ export default function Room() {
   if (!userId || !roomId) {
     return null;
   }
+  const handleLeaveRoom = () => {
+    wsClient.send({
+      type: "LEAVE_ROOM",
+      payload: { roomId, userId },
+    });
+    router.push("/lobby?userid=" + userId);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary">
@@ -117,6 +173,7 @@ export default function Room() {
               <Music className="h-6 w-6 text-primary" />
               <h1 className="text-2xl font-bold">Music Room</h1>
             </div>
+            <Button onClick={handleLeaveRoom}>Leave Room</Button>
           </div>
         </div>
 
@@ -128,30 +185,32 @@ export default function Room() {
           <Card className="flex-1 p-4 backdrop-blur-sm bg-background/80 flex flex-col">
             <ScrollArea ref={scrollRef} className="flex-1 pr-4">
               <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${
-                      message.userId === userId
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
+                {/* Merge and sort messages by timestamp */}
+                {[...hostMessages, ...receivedMessages]
+                  .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+                  .map((msg) => (
                     <div
-                      className={`max-w-[80%] ${
-                        message.userId === userId
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
-                      } rounded-lg px-4 py-2`}
+                      key={msg.id}
+                      className={`flex ${
+                        msg.userId === userId ? "justify-end" : "justify-start"
+                      }`}
                     >
-                      <p className="text-sm font-medium">{message.username}</p>
-                      <p>{message.content}</p>
-                      <p className="text-xs opacity-70">
-                        {new Date(message.timestamp).toLocaleTimeString()}
-                      </p>
+                      <div
+                        className={`max-w-[80%] rounded-lg px-4 py-2 text-white
+                  ${
+                    msg.userId === userId
+                      ? "bg-primary text-primary-foreground"
+                      : getUserColor(msg.userId)
+                  }`}
+                      >
+                        <p className="text-sm font-medium">{msg.userName}</p>
+                        <p>{msg.message}</p>
+                        <p className="text-xs opacity-70">
+                          {new Date(msg.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </ScrollArea>
 
@@ -182,7 +241,11 @@ export default function Room() {
                     key={participant.id}
                     className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted"
                   >
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <div
+                      className={`w-2 h-2 rounded-full ${getUserColor(
+                        participant.id
+                      )}`}
+                    />
                     <span>{participant.name}</span>
                   </div>
                 ))}

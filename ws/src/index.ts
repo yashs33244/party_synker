@@ -42,11 +42,34 @@ import { parse } from 'url';
       userManager.addUser(wsUser);
   
       console.log(`User ${userId} connected`);
+      const activeRoom = await prisma.usersInRoom.findFirst({
+        where: {
+          userId: userId.toString(),
+          leftAt: null
+        }
+      });
+      if (activeRoom) {
+        // if already in room don't add user to room
+        if(wsUser.getRoom() == activeRoom.roomId){
+          console.log('User already in room');
+        }
+
+          userManager.addUserToRoom(userId.toString(), activeRoom.roomId);
+      }
+      
+      
+      console.log(`User ${userId} connected`);
   
       ws.on('message', async (data: string) => {
         try {
           const message: IncomingMessage = JSON.parse(data);
           console.log('Received message:', message);
+          console.log('Users in UserManager after adding:', 
+            Array.from(userManager.getUsers().keys())
+          );
+          
+          // broadcast to all users of the room
+          
   
           switch (message.type) {
             case 'CREATE_ROOM':
@@ -64,6 +87,9 @@ import { parse } from 'url';
               break;
             case 'USER_MESSAGE':
               await subscriptionManager.handleUserMessage(message.payload);
+              break;
+            case 'GET_USERS':
+              await subscriptionManager.handleGetUsers(message.payload);
               break;
           }
         } catch (error:any) {

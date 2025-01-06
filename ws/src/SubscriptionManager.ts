@@ -9,31 +9,6 @@ export class SubscriptionManager {
     private userManager: UserManager
   ) {}
 
-  async handleJoinRoom(payload: JoinRoomPayload) {
-    const { userId, roomId } = payload;
-    const user = this.userManager.getUser(userId);
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    await this.prisma.usersInRoom.create({
-      data: {
-        userId,
-        roomId,
-        joinedAt: new Date(),
-      },
-    });
-
-    user.addRoom(roomId);
-    
-    const message: OutgoingMessage = {
-      type: 'ROOM_JOINED',
-      payload: { userId, roomId },
-    };
-    
-    this.userManager.broadcast(roomId, message);
-  }
-
   async handleLeaveRoom(payload: LeaveRoomPayload) {
     const { userId, roomId } = payload;
     const user = this.userManager.getUser(userId);
@@ -41,19 +16,10 @@ export class SubscriptionManager {
       throw new Error('User not found');
     }
 
-    await this.prisma.usersInRoom.update({
-      where: {
-        userId_roomId: {
-          userId,
-          roomId,
-        },
-      },
-      data: {
-        leftAt: new Date(),
-      },
-    });
+    
+    // delete users in room
 
-    user.removeRoom(roomId);
+    this.userManager.removeUserFromRoom(userId, roomId);
     
     const message: OutgoingMessage = {
       type: 'ROOM_LEFT',
@@ -66,16 +32,14 @@ export class SubscriptionManager {
   async handleCreateRoom(payload: CreateRoomPayload) {
     const { hostId, roomName } = payload;
     
-    // First verify if the user exists
     const user = await this.prisma.user.findUnique({
       where: { id: hostId }
     });
-
+  
     if (!user) {
       throw new Error('Host user not found');
     }
-
-    // Create the room with proper host connection
+  
     const room = await this.prisma.room.create({
       data: {
         roomName,
@@ -84,7 +48,6 @@ export class SubscriptionManager {
             id: hostId
           }
         },
-        // Also create the initial UsersInRoom entry for the host
         users: {
           create: {
             userId: hostId,
@@ -97,13 +60,12 @@ export class SubscriptionManager {
         users: true
       }
     });
-
-    // Add the room to the WebSocket user if they're connected
+  
+    // Explicitly add user to room in UserManager
+    this.userManager.addUserToRoom(hostId, room.id);
+    
     const wsUser = this.userManager.getUser(hostId);
     if (wsUser) {
-      wsUser.addRoom(room.id);
-      
-      // Notify the user that the room was created
       wsUser.send({
         type: 'ROOM_CREATED',
         payload: {
@@ -113,8 +75,72 @@ export class SubscriptionManager {
         }
       });
     }
-
+  
     return room;
+  }
+  
+  async handleJoinRoom(payload: JoinRoomPayload) {
+    const { userId, roomId } = payload;
+    const user = this.userManager.getUser(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+  
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId }
+    });
+  
+    if (!room) {
+      throw new Error('Room not found');
+    }
+  
+    const existingUserInRoom = await this.prisma.usersInRoom.findUnique({
+      where: {
+        userId_roomId: {
+          userId,
+          roomId
+        }
+      }
+    });
+  
+    if (existingUserInRoom && !existingUserInRoom.leftAt) {
+      throw new Error('User is already in this room');
+    }
+  
+    await this.prisma.usersInRoom.upsert({
+      where: {
+        userId_roomId: {
+          userId,
+          roomId
+        }
+      },
+      update: {
+        joinedAt: new Date(),
+        leftAt: null
+      },
+      create: {
+        userId,
+        roomId,
+        joinedAt: new Date()
+      }
+    });
+  
+    // Add user to room in UserManager
+    this.userManager.addUserToRoom(userId, roomId);
+    
+    const message: OutgoingMessage = {
+      type: 'ROOM_JOINED',
+      payload: { 
+        userId, 
+        roomId,
+        userName: (await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { name: true }
+        }))?.name 
+      },
+    };
+    
+    this.userManager.broadcast(roomId, message);
   }
 
   async handleCloseRoom(payload: CloseRoomPayload) {
@@ -143,13 +169,11 @@ export class SubscriptionManager {
   async handleUserMessage(payload: UserMessagePayload) {
     const { roomId, userId, message, messageType = 'TEXT' } = payload;
     
-    // Verify user exists
     const user = this.userManager.getUser(userId);
     if (!user) {
       throw new Error('User not found');
     }
 
-    // Verify user is in the room
     const userInRoom = await this.prisma.usersInRoom.findUnique({
       where: {
         userId_roomId: {
@@ -167,6 +191,14 @@ export class SubscriptionManager {
     }
 
     if (userInRoom.leftAt) {
+      await this.prisma.usersInRoom.delete({
+        where: {
+          userId_roomId: {
+            userId,
+            roomId
+          }
+        }
+      });
       throw new Error('User has left this room');
     }
 
@@ -174,9 +206,6 @@ export class SubscriptionManager {
       throw new Error('Room is closed');
     }
 
-    // You might want to store messages in database
-    // If you want to add a Messages table to your schema, you can do:
-    
     const savedMessage = await this.prisma.message.create({
       data: {
         content: message,
@@ -185,9 +214,7 @@ export class SubscriptionManager {
         roomId,
       }
     });
-    
 
-    // Prepare the outgoing message
     const outgoingMessage: OutgoingMessage = {
       type: 'USER_MESSAGE',
       payload: {
@@ -196,7 +223,6 @@ export class SubscriptionManager {
         message,
         messageType,
         timestamp: new Date().toISOString(),
-        // You might want to include additional user info
         userName: (await this.prisma.user.findUnique({
           where: { id: userId },
           select: { name: true }
@@ -204,18 +230,30 @@ export class SubscriptionManager {
       }
     };
 
-    // Broadcast the message to all users in the room except the sender
+    console.log('Current users in UserManager:', 
+      Array.from(this.userManager.getUsers().keys())
+    );
+
     this.userManager.broadcast(roomId, outgoingMessage, userId);
 
-    // Also send confirmation back to the sender
     user.send({
       type: 'MESSAGE_SENT',
       payload: {
-        messageId: Date.now().toString(), // or use savedMessage.id if storing in DB
+        messageId: savedMessage.id,
         timestamp: new Date().toISOString()
       }
     });
 
     return outgoingMessage;
+  }
+
+  async handleGetUsers(payload: { roomId: string }) {
+    const { roomId } = payload;
+    const users = await this.prisma.usersInRoom.findMany({
+      where: { roomId },
+      select: { userId: true }
+    });
+
+    return users.map((u:any) => u.userId);
   }
 }

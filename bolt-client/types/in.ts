@@ -1,5 +1,5 @@
 export interface IncomingMessage {
-  type: 'JOIN_ROOM' | 'LEAVE_ROOM' | 'CREATE_ROOM' | 'CLOSE_ROOM' | 'USER_MESSAGE' | 'MUSIC_STATE_UPDATE' | 'MUSIC_ACTION';
+  type: 'JOIN_ROOM' | 'LEAVE_ROOM' | 'CREATE_ROOM' | 'CLOSE_ROOM' | 'USER_MESSAGE' | 'MUSIC_STATE_UPDATE' | 'MUSIC_ACTION' | 'GET_USERS';
 
   payload: any;
 }

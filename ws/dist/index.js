@@ -45,10 +45,26 @@ wss.on('connection', (ws, req) => __awaiter(void 0, void 0, void 0, function* ()
         const wsUser = new User_1.User(userId.toString(), ws);
         userManager.addUser(wsUser);
         console.log(`User ${userId} connected`);
+        const activeRoom = yield shared_db_1.default.usersInRoom.findFirst({
+            where: {
+                userId: userId.toString(),
+                leftAt: null
+            }
+        });
+        if (activeRoom) {
+            // if already in room don't add user to room
+            if (wsUser.getRoom() == activeRoom.roomId) {
+                console.log('User already in room');
+            }
+            userManager.addUserToRoom(userId.toString(), activeRoom.roomId);
+        }
+        console.log(`User ${userId} connected`);
         ws.on('message', (data) => __awaiter(void 0, void 0, void 0, function* () {
             try {
                 const message = JSON.parse(data);
                 console.log('Received message:', message);
+                console.log('Users in UserManager after adding:', Array.from(userManager.getUsers().keys()));
+                // broadcast to all users of the room
                 switch (message.type) {
                     case 'CREATE_ROOM':
                         const room = yield subscriptionManager.handleCreateRoom(message.payload);
@@ -65,6 +81,9 @@ wss.on('connection', (ws, req) => __awaiter(void 0, void 0, void 0, function* ()
                         break;
                     case 'USER_MESSAGE':
                         yield subscriptionManager.handleUserMessage(message.payload);
+                        break;
+                    case 'GET_USERS':
+                        yield subscriptionManager.handleGetUsers(message.payload);
                         break;
                 }
             }

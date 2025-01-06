@@ -12,21 +12,26 @@ export default function Home() {
             <MessageCircle className="h-12 w-12 text-primary" />
             <h1 className="text-4xl font-bold">ChatSphere</h1>
           </div>
-          
+
           <Card className="w-full max-w-2xl p-8 backdrop-blur-sm bg-background/80">
             <h2 className="text-2xl font-semibold mb-4">
               Connect, Chat, Collaborate
             </h2>
             <p className="text-muted-foreground mb-8">
-              Join our real-time chat platform where you can create rooms, 
+              Join our real-time chat platform where you can create rooms,
               connect with others, and communicate seamlessly.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <Button asChild size="lg" className="w-full sm:w-auto">
                 <Link href="/login">Login</Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="w-full sm:w-auto"
+              >
                 <Link href="/signup">Sign Up</Link>
               </Button>
             </div>
@@ -34,8 +39,8 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
             <FeatureCard
-              title="Create Rooms"
-              description="Create private or public chat rooms for different topics and discussions."
+              title="Perfect Sync Music"
+              description="Play music in sync with your friends in real-time."
             />
             <FeatureCard
               title="Real-time Chat"
@@ -52,7 +57,13 @@ export default function Home() {
   );
 }
 
-function FeatureCard({ title, description }: { title: string; description: string }) {
+function FeatureCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <Card className="p-6 backdrop-blur-sm bg-background/80">
       <h3 className="text-lg font-semibold mb-2">{title}</h3>
