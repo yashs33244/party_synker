@@ -257,20 +257,27 @@ export class SubscriptionManager {
 
     return users.map((u:any) => u.userId);
   }
-  async handleMusicLoaded({ roomId, userId }: MusicLoadedPayload) {
+  async handleMusicLoaded(payload: MusicLoadedPayload) {
+    const { roomId, userId } = payload;
+    
+    // Initialize set of loaded users for this room if it doesn't exist
     if (!this.loadedUsers.has(roomId)) {
       this.loadedUsers.set(roomId, new Set());
     }
     
+    // Add this user to the set of loaded users
     const loadedUsersInRoom = this.loadedUsers.get(roomId)!;
     loadedUsersInRoom.add(userId);
     
+    // Get all users in the room
     const roomUsers = this.userManager.getRoomUsers(roomId);
     
     // If all users have loaded, broadcast play command
     if (loadedUsersInRoom.size === roomUsers.size) {
+      // Clear loaded users for next song
       this.loadedUsers.delete(roomId);
       
+      // Broadcast play command with timestamp
       const playTimestamp = Date.now() + 1000; // Play in 1 second
       this.userManager.broadcast(roomId, {
         type: 'MUSIC_COMMAND',
@@ -282,9 +289,13 @@ export class SubscriptionManager {
     }
   }
 
-  async handleMusicPlay({ roomId, songUrl }: MusicPlayPayload) {
+  async handleMusicPlay(payload: MusicPlayPayload) {
+    const { roomId, songUrl } = payload;
+    
+    // Clear any existing loaded users for this room
     this.loadedUsers.delete(roomId);
     
+    // Broadcast load command to all users
     this.userManager.broadcast(roomId, {
       type: 'MUSIC_COMMAND',
       payload: {
