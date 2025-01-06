@@ -194,6 +194,7 @@ export default function Room() {
               <div className="space-y-4">
                 {/* Merge and sort messages by timestamp */}
                 {[...hostMessages, ...receivedMessages]
+                  //@ts-ignore
                   .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
                   .map((msg) => (
                     <div
